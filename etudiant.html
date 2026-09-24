@@ -150,52 +150,91 @@
     <div id="message"></div>
 </div>
 
-<script>
-    const form = document.getElementById('form-recu');
-    const messageDiv = document.getElementById('message');
-    const btnSoumettre = document.getElementById('btn-soumettre');
-    const erreurCheckbox = document.getElementById('erreur-checkbox');
+<script type="module">
+    // 1. IMPORTATION DE SUPABASE
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    form.addEventListener('submit', async function(event) {
-        event.preventDefault(); 
+// 2. CONFIGURATION (Remplace par tes vraies clés !)
+const supabaseUrl = 'https://rayblsnadwxikqfzuxpc.supabase.co'; // Ex: https://xyz.supabase.co
+const supabaseKey = 'sb_publishable_3z4c_zmj-AVtzrch8rgDfg_E2gLFNjP';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-        // 1. Récupération de toutes les cases cochées
-        const casesCochees = document.querySelectorAll('input[name="type_paiement"]:checked');
+// 3. SÉLECTION DES ÉLÉMENTS DU FORMULAIRE
+const form = document.getElementById('form-recu');
+const messageDiv = document.getElementById('message');
+const btnSoumettre = document.getElementById('btn-soumettre');
+const erreurCheckbox = document.getElementById('erreur-checkbox');
+
+// 4. ACTION À L'ENVOI DU FORMULAIRE
+form.addEventListener('submit', async function(event) {
+    event.preventDefault(); 
+
+    // Vérification des cases à cocher
+    const casesCochees = document.querySelectorAll('input[name="type_paiement"]:checked');
+    if (casesCochees.length === 0) {
+        erreurCheckbox.style.display = 'block';
+        return;
+    } else {
+        erreurCheckbox.style.display = 'none';
+    }
+
+    let typesSelectionnes = [];
+    casesCochees.forEach((c) => typesSelectionnes.push(c.value));
+    const typesEnTexte = typesSelectionnes.join(", "); // Transforme ["Inscription", "Chambre"] en "Inscription, Chambre"
+
+    const details = document.getElementById('details_recu').value;
+    const fichier = document.getElementById('fichier_recu').files[0];
+
+    // On change le bouton
+    btnSoumettre.textContent = "Envoi en cours (ne fermez pas la page)...";
+    btnSoumettre.disabled = true;
+
+    try {
+        // --- ÉTAPE A : ENVOYER LE FICHIER DANS LE STORAGE ---
         
-        // 2. Vérification : l'étudiant a-t-il coché au moins une case ?
-        if (casesCochees.length === 0) {
-            erreurCheckbox.style.display = 'block'; // Affiche le message d'erreur
-            return; // Bloque l'envoi du formulaire
-        } else {
-            erreurCheckbox.style.display = 'none'; // Cache l'erreur si tout va bien
-        }
-
-        // 3. Création d'une liste (tableau) avec le nom des cases cochées
-        let typesSelectionnes = [];
-        casesCochees.forEach((caseActuelle) => {
-            typesSelectionnes.push(caseActuelle.value);
-        });
-
-        const details = document.getElementById('details_recu').value;
-        const fichier = document.getElementById('fichier_recu').files[0];
-
-        btnSoumettre.textContent = "Envoi en cours...";
-        btnSoumettre.disabled = true;
+        // On génère un nom de fichier unique avec la date exacte pour éviter les doublons
+        const nomFichierUnique = Date.now() + "_" + fichier.name; 
         
-        setTimeout(() => {
-            // La console affichera désormais un tableau avec tous les choix : ex: ["1ère Tranche", "Chambre"]
-            console.log("Éléments payés :", typesSelectionnes.join(", "));
-            console.log("Détails saisis :", details);
-            console.log("Fichier prêt :", fichier.name);
+        // Envoi vers le bucket "recus"
+        const { data: dataFichier, error: erreurFichier } = await supabase.storage
+            .from('recus')
+            .upload(nomFichierUnique, fichier);
 
-            messageDiv.innerHTML = `<span style="color: green;">✅ Votre reçu pour [${typesSelectionnes.join(", ")}] a été envoyé avec succès.</span>`;
-            
-            form.reset();
-            btnSoumettre.textContent = "Envoyer à la comptabilité";
-            btnSoumettre.disabled = false;
+        if (erreurFichier) throw erreurFichier;
 
-        }, 2000); 
-    });
+        // On récupère le lien public du fichier qu'on vient d'uploader
+        const lienFichier = supabase.storage.from('recus').getPublicUrl(nomFichierUnique).data.publicUrl;
+
+        // --- ÉTAPE B : ENREGISTRER LES DONNÉES DANS LA TABLE ---
+        
+        const { data: dataBase, error: erreurBase } = await supabase
+            .from('recus_paiement')
+            .insert([
+                { 
+                    etudiant_matricule: 'SIMULATION-001', // On met un faux matricule pour l'instant
+                    types_paiement: typesEnTexte,
+                    details: details,
+                    fichier_url: lienFichier
+                    // Pas besoin de mettre le statut, il sera "En attente" par défaut !
+                }
+            ]);
+
+        if (erreurBase) throw erreurBase;
+
+        // --- ÉTAPE C : SUCCÈS ! ---
+        messageDiv.innerHTML = `<span style="color: green;">✅ Votre reçu a été enregistré avec succès !</span>`;
+        form.reset();
+
+    } catch (erreur) {
+        // En cas de problème (ex: pas de connexion internet)
+        console.error("Erreur détaillée :", erreur);
+        messageDiv.innerHTML = `<span style="color: red;">❌ Une erreur est survenue : ${erreur.message}</span>`;
+    } finally {
+        // Quoi qu'il arrive, on remet le bouton à la normale
+        btnSoumettre.textContent = "Envoyer à la comptabilité";
+        btnSoumettre.disabled = false;
+    }
+});
 </script>
 
 </body>
