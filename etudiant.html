@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mon Cursus - Espace Étudiant</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            background-color: #ffeaa7; 
+            color: #d35400;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .label-titre {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: bold;
+        }
+        
+        /* Style spécifique pour le groupe de cases à cocher */
+        .checkbox-group {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .checkbox-group label {
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            margin: 0;
+        }
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        input[type="file"], textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box; 
+            font-family: inherit;
+        }
+        textarea {
+            resize: vertical; 
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            width: 100%;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #message {
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .erreur {
+            color: red;
+            font-size: 13px;
+            margin-top: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Mon Cursus</h1>
+    <p>Bonjour, <strong>Étudiant</strong></p>
+    
+    <div class="status-badge" id="badge-statut">
+        ⚠️ Inscription : En attente de validation
+    </div>
+
+    <form id="form-recu">
+        
+        <!-- Remplacement du Select par des Checkboxes -->
+        <div class="form-group">
+            <span class="label-titre">Que couvre ce reçu ? (Cochez toutes les cases correspondantes)</span>
+            <div class="checkbox-group">
+                <label><input type="checkbox" name="type_paiement" value="Inscription"> Frais d'inscription</label>
+                <label><input type="checkbox" name="type_paiement" value="1ère Tranche"> 1ère Tranche de scolarité</label>
+                <label><input type="checkbox" name="type_paiement" value="2ème Tranche"> 2ème Tranche de scolarité</label>
+                <label><input type="checkbox" name="type_paiement" value="Chambre"> Loyer Chambre</label>
+                <label><input type="checkbox" name="type_paiement" value="Autres frais"> Autres frais</label>
+            </div>
+            <div id="erreur-checkbox" class="erreur">Veuillez cocher au moins une case.</div>
+        </div>
+
+        <!-- Zone de texte avec un placeholder plus explicatif -->
+        <div class="form-group">
+            <label class="label-titre" for="details_recu">Détaillez la répartition du paiement :</label>
+            <textarea id="details_recu" rows="4" placeholder="Exemple : J'ai payé 350 000 FCFA en tout via coris bank.&#10;- 200 000 pour l'inscription&#10;- 150 000 pour la chambre.&#10;Numéro de transaction : MP123456" required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="label-titre" for="fichier_recu">Joindre le reçu (Image ou PDF) :</label>
+            <input type="file" id="fichier_recu" accept=".jpg, .jpeg, .png, .pdf" required>
+        </div>
+
+        <button type="submit" id="btn-soumettre">Envoyer à la comptabilité</button>
+    </form>
+
+    <div id="message"></div>
+</div>
+
+<script>
+    const form = document.getElementById('form-recu');
+    const messageDiv = document.getElementById('message');
+    const btnSoumettre = document.getElementById('btn-soumettre');
+    const erreurCheckbox = document.getElementById('erreur-checkbox');
+
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault(); 
+
+        // 1. Récupération de toutes les cases cochées
+        const casesCochees = document.querySelectorAll('input[name="type_paiement"]:checked');
+        
+        // 2. Vérification : l'étudiant a-t-il coché au moins une case ?
+        if (casesCochees.length === 0) {
+            erreurCheckbox.style.display = 'block'; // Affiche le message d'erreur
+            return; // Bloque l'envoi du formulaire
+        } else {
+            erreurCheckbox.style.display = 'none'; // Cache l'erreur si tout va bien
+        }
+
+        // 3. Création d'une liste (tableau) avec le nom des cases cochées
+        let typesSelectionnes = [];
+        casesCochees.forEach((caseActuelle) => {
+            typesSelectionnes.push(caseActuelle.value);
+        });
+
+        const details = document.getElementById('details_recu').value;
+        const fichier = document.getElementById('fichier_recu').files[0];
+
+        btnSoumettre.textContent = "Envoi en cours...";
+        btnSoumettre.disabled = true;
+        
+        setTimeout(() => {
+            // La console affichera désormais un tableau avec tous les choix : ex: ["1ère Tranche", "Chambre"]
+            console.log("Éléments payés :", typesSelectionnes.join(", "));
+            console.log("Détails saisis :", details);
+            console.log("Fichier prêt :", fichier.name);
+
+            messageDiv.innerHTML = `<span style="color: green;">✅ Votre reçu pour [${typesSelectionnes.join(", ")}] a été envoyé avec succès.</span>`;
+            
+            form.reset();
+            btnSoumettre.textContent = "Envoyer à la comptabilité";
+            btnSoumettre.disabled = false;
+
+        }, 2000); 
+    });
+</script>
+
+</body>
+</html>
